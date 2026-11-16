@@ -2,6 +2,7 @@
 #include "lcd_strip.h"
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <stdexcept>
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -87,6 +88,9 @@ public:
 };
 }
 std::unique_ptr<DisplayBackend> createLcdDisplay(const std::string& device) {
+    std::ifstream info("/sys/class/graphics/"+device.substr(device.find_last_of('/')+1)+"/name");
+    std::string name;std::getline(info,name);
+    if(name=="ili9486drmfb")return createDrmDisplay({});
     return std::make_unique<LcdDisplay>(device);
 }
 }

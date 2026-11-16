@@ -6,6 +6,7 @@
 namespace sr {
 // Headless output has no physical brightness; LCD overrides this method.
 void DisplayBackend::setBrightness(int) {}
+void DisplayBackend::verifyOutput(const Framebuffer&) const {throw std::runtime_error("Scanout verification requires native DRM output");}
 Viewport Viewport::fit(int w,int h) {
     int scale=std::min(w/64,h/64);
     if(scale<1||w>16384||h>16384) throw std::runtime_error("Display must fit at least 64x64 and be at most 16384x16384");

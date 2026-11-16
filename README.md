@@ -29,16 +29,35 @@ Each contact belongs to the side where it began; jumping sides cancels it.
 
 ## LCD prerequisites
 
-The LCD's Linux display driver must already expose a **480x320 truecolor
-framebuffer**, normally `/dev/fb1` on older SPI LCD setups. Use `--fb /dev/fb0`
-if that is the LCD device. RGB565, 24-bit RGB and 32-bit RGB are supported,
-using the driver's channel layout, row stride and visible offsets.
-The fb_ili9486 FBTFT RGB565 layout is supported with its nonstd=1 flag.
+The installed Pi uses the native ILI9486 DRM driver at **32 MHz SPI**:
+
+```text
+dtoverlay=piscreen,drm,rotate=180,speed=32000000
+```
+
+The LCD must expose 480x320. With `--fb /dev/fb0`, the application detects
+`ili9486drmfb` and discovers the corresponding DRM card by driver name.
+It sends only the changed bounding rectangle, including any changed strip
+pixels. A full upload at startup and every two seconds clears stale pixels.
+The native backend temporarily acquires the graphics console and the stock
+CPU `performance` policy; both are restored on exit. The service's recovery
+helpers cover abnormal termination. No overclock or voltage changes are used.
+
+Measured on this Pi: **120 completed full-UI uploads in 6.77085 s = 17.723 FPS**,
+with both touch strips present and zero SPI errors/timeouts. Smaller changes
+need less data. This measures completed blocking DRM uploads, not the LCD's
+optical scan rate. `build/lcd-performance.txt` on the Pi records the result.
+The test verified every active RGB565 scanout pixel, exact 5x replication,
+both strips, a partial update and brightness 0/50/100%.
+
+The legacy FBTFT fallback remains available when its driver is selected.
+It supports packed 16/24/32-bit truecolor with the driver's channel layout,
+row stride and offsets, including fb_ili9486's RGB565 nonstd=1 flag.
 Unsupported modes fail explicitly instead of stretching the image.
 XPT2046 identifies the touch controller, not the LCD controller; the exact
-LCD overlay depends on the actual board. This repository does not install
-overlays, change boot configuration or configure the screen automatically.
-The framebuffer must not be used by another application or a console.
+LCD overlay depends on the actual board. The application itself does not
+install overlays or change boot configuration. On the installed Pi, the
+known working DRM overlay has been saved in `/boot/firmware/config.txt`.
 No desktop, browser, rpi-rgb-led-matrix or I2C touch library is required.
 
 Brightness 0..100% scales RGB values in software; zero produces black.
@@ -50,11 +69,13 @@ Framebuffer layout follows the [Linux framebuffer API](https://docs.kernel.org/f
 
 Dependencies: C++17 compiler, make, pkg-config, libglib2.0-dev,
 BlueZ bluetoothd/bluetooth-meshd, D-Bus and NetworkManager.
+The native DRM backend also needs libdrm-dev (already installed on the Pi);
+without it only FBTFT/headless output is built. Console recovery uses fuser.
 
 ```sh
 make -j4
 make test
-sudo ./run.sh --fb /dev/fb1
+sudo ./run.sh --fb /dev/fb0
 ```
 
 Alternatively use CMake with the same dependencies:

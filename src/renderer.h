@@ -20,9 +20,11 @@ public:
     virtual std::string name() const=0;
     // Physical backends implement display brightness.
     virtual void setBrightness(int percent);
+    virtual void verifyOutput(const Framebuffer& frame) const;
 };
 std::vector<RGB> scaleFrame(const Framebuffer& f,const Viewport& v);
 void writePPM(const std::string& path,int w,int h,const RGB* pixels);
 std::unique_ptr<DisplayBackend> createHeadless(int w,int h);
+std::unique_ptr<DisplayBackend> createDrmDisplay(const std::string& device);
 std::unique_ptr<DisplayBackend> createLcdDisplay(const std::string& device);
 }
