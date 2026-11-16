@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "lcd_strip.h"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -68,6 +69,7 @@ public:
     void setBrightness(int value) override {percent=std::clamp(value,0,100);}
     void present(const Framebuffer& frame) override {
         auto pixels=scaleFrame(frame,v);
+        drawTouchStrip(pixels,v.width,v.height);
         const unsigned bytes=screen.bits_per_pixel/8;
         for(int y=0;y<v.height;++y) {
             auto* row=memory+(size_t(y)+screen.yoffset)*fixed.line_length+size_t(screen.xoffset)*bytes;

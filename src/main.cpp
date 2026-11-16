@@ -3,6 +3,7 @@
 #include "web.h"
 #include "renderer.h"
 #include "hub_demo.h"
+#include "lcd_touch.h"
 #include <chrono>
 #include <csignal>
 #include <iostream>
@@ -64,13 +65,18 @@ int main(int argc,char** argv) {
             std::cout<<"Local web interface: http://<Wi-Fi IP>:"<<webPort<<"\n"<<std::flush;
         }
         sr::Framebuffer frame;int rendered=0;bool offPresented=false;
-        sr::HubDemo demo;const sr::GestureSample touchSample{};
+        sr::HubDemo demo;sr::GestureSample touchSample{};
+        std::unique_ptr<sr::LcdTouch> touch;
+        if(!headless)touch=std::make_unique<sr::LcdTouch>();
         int64_t fadeStart=-1;
         using Clock=std::chrono::steady_clock;auto next=Clock::now();
         while(running&&(frames==0||rendered<frames)) {
             auto state=gateway?gateway->view():sr::mesh::View{};
             if(!state.error.empty())throw std::runtime_error("Gateway unavailable: "+state.error);
             const int64_t tick=sr::mesh::monotonicUs();
+            if(touch)for(const auto& sample:touch->poll()) {
+                touchSample=sample;demo.draw(frame,touchSample,tick,state,webPort);
+            }
             demo.draw(frame,touchSample,tick,state,webPort);
             const int brightnessRequest=demo.takeBrightnessRequest();
             if(gateway&&brightnessRequest>=0)gateway->requestBrightness(brightnessRequest);
@@ -91,6 +97,7 @@ int main(int argc,char** argv) {
             unsigned percent=gateway?gateway->view().brightness:50;
             for(auto& pixel:preview.pixels)pixel={uint8_t(pixel.r*percent/100),uint8_t(pixel.g*percent/100),uint8_t(pixel.b*percent/100)};
             auto scaled=sr::scaleFrame(preview,viewport);
+            sr::drawTouchStrip(scaled,viewport.width,viewport.height,int(percent));
             sr::writePPM(dump+"-preview.ppm",viewport.width,viewport.height,scaled.data());
         }
         return 0;

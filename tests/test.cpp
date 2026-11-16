@@ -1,5 +1,7 @@
 #include "framebuffer.h"
 #include "renderer.h"
+#include "lcd_strip.h"
+#include "hub_demo.h"
 #include "screens/readings.h"
 #include <iostream>
 #include <stdexcept>
@@ -25,6 +27,32 @@ int main() {
         for(int i=0;i<64*64;++i)check(equal(nativePixels[i],f.pixels[i]),"64x64 output preserves every RGB pixel");
         auto out=scaleFrame(f,v);
         for(int y=0;y<320;++y)for(int x=0;x<480;++x)check(equal(out[y*480+x],x<80||x>=400?black:f.at((x-80)/5,y/5)),"every physical pixel is an exact sample; margins black");
+        auto withStrip=out;drawTouchStrip(withStrip,480,320);
+        for(int y=0;y<320;++y)for(int x=0;x<480;++x) {
+            const bool line=x>=468&&x<471&&y>=12&&y<=307;
+            check(equal(withStrip[y*480+x],line?RGB{150,150,150}:out[y*480+x]),"only the right strip changes the output");
+        }
+        StripContact strip;
+        check(strip.update(468,12,true).position==0,"strip top is zero");
+        check(strip.update(468,307,true).position==1,"downward swipe increases position");
+        check(strip.update(468,160,false).position==-1,"release");
+        check(strip.update(399,160,true).position==-1,"UI touch ignored");
+        check(strip.update(468,160,true).position==-1,"entering strip during outside contact ignored");
+        strip.update(468,160,false);
+        check(strip.update(450,160,true).position>0,"wide hit area beside line");
+        check(!strip.update(430,160,true).healthy,"leaving strip cancels without a click");
+        check(!strip.update(468,160,true).healthy,"cancelled contact cannot resume");
+        check(strip.update(468,160,false).healthy,"release clears cancellation");
+        drawTouchStrip(withStrip,480,320,0);
+        check(equal(withStrip[160*480+468],black),"zero brightness hides line while touch stays available");
+        HubDemo ui;mesh::View state;Framebuffer uiFrame;StripContact control;
+        auto gesture=[&](double y,bool down,int64_t time) {ui.draw(uiFrame,control.update(468,y,down),time,state);};
+        gesture(240,true,1000000);gesture(40,true,1100000);gesture(40,false,1200000); // Quick.
+        gesture(180,true,1300000);gesture(180,true,2010000); // Hold starts brightness adjustment.
+        gesture(307,true,2050000);
+        check(ui.displayBrightness(50)==100,"strip hold and motion reach maximum brightness");
+        gesture(307,false,2100000);
+        check(ui.takeBrightnessRequest()==100,"release saves brightness through existing UI contract");
         for(uint8_t rotation=1;rotation<=4;++rotation) {
             auto rotated=f;screens::rotate(rotated,rotation);
             for(int y=0;y<64;++y)for(int x=0;x<64;++x) {
@@ -35,6 +63,6 @@ int main() {
                 check(equal(rotated.at(nx,ny),f.at(x,y)),"rotation preserves every RGB pixel");
             }
         }
-        std::cout<<"PASS: native RGB, scaling, margins, coordinates and all rotations\n";
+        std::cout<<"PASS: native RGB, scaling, margins, coordinates, touch strip and all rotations\n";
     } catch(const std::exception& e) {std::cerr<<"FAIL: "<<e.what()<<'\n';return 1;}
 }
