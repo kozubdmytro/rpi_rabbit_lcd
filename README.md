@@ -19,6 +19,7 @@ The LCD's Linux display driver must already expose a **480x320 truecolor
 framebuffer**, normally `/dev/fb1` on older SPI LCD setups. Use `--fb /dev/fb0`
 if that is the LCD device. RGB565, 24-bit RGB and 32-bit RGB are supported,
 using the driver's channel layout, row stride and visible offsets.
+The fb_ili9486 FBTFT RGB565 layout is supported with its nonstd=1 flag.
 Unsupported modes fail explicitly instead of stretching the image.
 XPT2046 identifies the touch controller, not the LCD controller; the exact
 LCD overlay depends on the actual board. This repository does not install
