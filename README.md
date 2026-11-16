@@ -12,11 +12,12 @@ inside the original 64x64 frame, as in the matrix version.
 MPR121 and HUB75 code and dependencies are removed. The XPT2046/ADS7846
 resistive touchscreen now drives the existing gesture logic through two
 vertical control areas at the physical edges. Both gray lines are 9 pixels
-wide: x=6..14 and x=465..473, y=12..307. Touch targets are x=0..39 and
-x=440..479 across the screen height.
+wide: x=6..14 and x=465..473, y=12..307. Touch targets use the full side margins x=0..79 and
+x=400..479 across the screen height.
 Position increases downward. Taps, swipes and 700 ms holds retain their
-original meaning. A touch must begin inside the strip; leaving it cancels
-without a click. Touches on the 320x320 UI do nothing.
+original meaning. A touch must begin in a side margin. Once captured, it follows vertical
+motion anywhere on the display until release; horizontal drift never cancels
+it. Contacts that start on the 320x320 UI are ignored.
 
 The input reader discovers ADS7846 by device name, so event numbering may
 change. It reads nonblocking evdev packets and retries after input loss.
@@ -25,7 +26,9 @@ affine format; otherwise the default is uncalibrated landscape rotate=90.
 The installed Pi reuses its existing calibrated file. Calibration is ignored
 by Git. Software brightness also dims the strip; touch remains active at 0%.
 The strips stay at the physical edges when UI rotation changes.
-Each contact belongs to the side where it began; jumping sides cancels it.
+Both tracks act as continuous sliders, without electrode zones or endpoint
+dead bands. A three-sample median rejects isolated resistive coordinate
+spikes; deliberate movement is continuous and spans the whole track.
 
 ## LCD prerequisites
 

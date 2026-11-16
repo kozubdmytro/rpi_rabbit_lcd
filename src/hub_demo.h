@@ -88,8 +88,8 @@ class HubDemo {
             controlValue=type()==2?settings[selected].light:(type()==4?settings[selected].blinds:settings[selected].setpoint);
             controlModule=selected;
         }
-        // Half an electrode at each end makes the full range reachable.
-        const double fraction=std::clamp((position-0.04)/0.92,0.0,1.0);
+        // The LCD slider already maps its visible track to the full range.
+        const double fraction=std::clamp(position,0.0,1.0);
         controlTarget=type()==5?100+200*fraction:100*fraction;
         controlMoving=true;
     }
@@ -138,7 +138,7 @@ public:
                 else {selected=index();page=Home;}
                 last=input.position;
             }
-            if(brightnessAdjust)panelBrightness=int(std::round(100*std::clamp((input.position-0.04)/0.92,0.0,1.0)));
+            if(brightnessAdjust)panelBrightness=int(std::round(100*std::clamp(input.position,0.0,1.0)));
             else if(quickAdjust)adjust(input.position);
             else if(!held) {
                 if(!swiped&&std::abs(input.position-origin)>0.08) {swiped=true;last=origin;}
