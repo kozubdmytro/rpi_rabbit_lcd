@@ -1,0 +1,24 @@
+[Unit]
+Description=Smart Rabbit LCD 320x320 Mesh Gateway
+After=local-fs.target bluetooth.service bluetooth-mesh.service
+Requires=bluetooth.service bluetooth-mesh.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/srlab/smartrabbit-test
+ExecStart=/home/srlab/smartrabbit-test/build/smartrabbit-test
+RuntimeDirectory=smartrabbit-test
+RuntimeDirectoryMode=0755
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+KillSignal=SIGINT
+TimeoutStartSec=20
+TimeoutStopSec=5
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

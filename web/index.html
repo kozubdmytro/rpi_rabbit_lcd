@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Локальное управление хабом Smart Rabbit">
+  <title>Smart Rabbit · Хаб</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div><span class="eyebrow">SMART RABBIT</span><h1>Управление хабом</h1></div><span id="connection" class="badge">Подключение…</span></header>
+    <p id="simulation" class="notice" hidden>Симуляция на компьютере. Команды не отправляются на Raspberry Pi и ноды.</p>
+    <p id="message" role="status" aria-live="polite">Загружаем состояние хаба…</p>
+    <section aria-labelledby="display-title">
+      <h2 id="display-title">Матрица</h2>
+      <form id="brightness-form"><label for="brightness">Яркость <output id="brightness-value" for="brightness">50%</output></label>
+        <div class="control"><input id="brightness" name="brightness" type="range" min="0" max="100" step="1" value="50"><button type="submit">Применить</button></div>
+        <small>0% — экран выключен. Максимальная яркость — 100%.</small>
+      </form>
+      <form id="rotation-form"><label for="rotation">Поворот экрана</label><div class="control"><select id="rotation" name="rotation"><option value="1">0°</option><option value="2">90°</option><option value="3" selected>180°</option><option value="4">270°</option></select><button type="submit">Применить</button></div></form>
+    </section>
+    <section aria-labelledby="menu-title">
+      <h2 id="menu-title">Меню матрицы</h2>
+      <p class="muted">До 16 пунктов. Имена: латиница, цифры, пробел, _ - . (до 16 символов). Climate показывает только свежие данные выбранной ноды; без данных — прочерки. Остальные типы — симуляция.</p>
+      <ul id="menu-items" class="nodes"></ul>
+      <div class="actions"><select id="menu-type" aria-label="Тип нового пункта"><option value="0">climate</option><option value="1">soil</option><option value="2">lights</option><option value="3">plug</option><option value="4">blinds</option><option value="5">thermo</option></select><button id="menu-add" type="button">Добавить пункт</button><button id="menu-save" type="button">Сохранить меню</button><button id="menu-cancel" type="button">Отменить правки</button></div>
+      <small>Изменения применятся после сохранения. Выбранный экран и значения симуляции при изменении меню сбрасываются.</small>
+    </section>
+    <section aria-labelledby="nodes-title"><div class="section-head"><h2 id="nodes-title">Ноды <span id="node-count" class="count">0 / 10</span></h2><button id="scan" type="button">Найти ноды</button></div>
+      <p id="operation" aria-live="polite">Ожидание</p><ul id="nodes" class="nodes"></ul><p id="empty" class="muted">Нет добавленных нодов. Включите ноду и запустите поиск.</p>
+      <div id="discovery" hidden><h3>Найдены рядом</h3><ul id="candidates" class="nodes"></ul></div>
+      <small>Удаление сбрасывает ключи ноды и удаляет её с хаба. Нода должна быть включена и доступна.</small>
+    </section>
+    <footer><span id="address">Локальное подключение</span><span>Bluetooth используется только для настройки Wi-Fi.</span></footer>
+  </main>
+</body>
+</html>

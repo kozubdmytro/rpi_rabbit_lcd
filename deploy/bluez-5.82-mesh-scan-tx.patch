@@ -1,0 +1,203 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# BlueZ 5.82 mesh/mesh-io-mgmt.c; upstream Intel copyright retained.
+# SRLAB BCM43455 workaround, hardware behavior unverified.
+--- a/mesh/mesh-io-mgmt.c
++++ b/mesh/mesh-io-mgmt.c
+@@ -58,7 +58,6 @@
+ 
+ struct tx_pkt {
+ 	struct mesh_io_send_info	info;
+-	bool				delete;
+ 	uint8_t				len;
+ 	uint8_t				pkt[30];
+ };
+@@ -223,7 +222,15 @@
+ static void send_cmplt(uint16_t index, uint16_t length,
+ 					const void *param, void *user_data)
+ {
+-	/* print_packet("Mesh Send Complete", param, length); */
++	struct mesh_io_private *pvt = user_data;
++
++	if (!pvt || index != pvt->send_idx || length != 1)
++		return;
++
++	if (pvt->sending && *(const uint8_t *) param == pvt->handle) {
++		pvt->sending = false;
++		pvt->handle = 0;
++	}
+ }
+ 
+ static void event_device_found(uint16_t index, uint16_t length,
+@@ -270,11 +277,6 @@
+ 	}
+ }
+ 
+-static bool simple_match(const void *a, const void *b)
+-{
+-	return a == b;
+-}
+-
+ static bool find_by_ad_type(const void *a, const void *b)
+ {
+ 	const struct tx_pkt *tx = a;
+@@ -313,7 +315,8 @@
+ {
+ 	int index = L_PTR_TO_UINT(user_data);
+ 
+-	l_debug("HCI%d Mesh up status: %d", index, status);
++	if (status)
++		l_error("HCI%d Mesh receiver control failed: %d", index, status);
+ }
+ 
+ static void le_up(uint8_t status, uint16_t length,
+@@ -324,27 +327,35 @@
+ 	l_debug("HCI%d LE up status: %d", index, status);
+ }
+ 
+-static void ctl_up(uint8_t status, uint16_t length,
+-					const void *param, void *user_data)
+-{
+-	int index = L_PTR_TO_UINT(user_data);
+-	uint16_t len;
+-	struct mgmt_cp_set_mesh *mesh;
++/* Keep the same Mesh filters and scan parameters on pause and resume. */
++static void set_mesh_receiver(uint16_t index, bool enable)
++{
++	uint8_t buffer[sizeof(struct mgmt_cp_set_mesh) + 3];
++	struct mgmt_cp_set_mesh *mesh = (void *) buffer;
+ 	uint8_t mesh_ad_types[] = { MESH_AD_TYPE_NETWORK,
+ 				MESH_AD_TYPE_BEACON, MESH_AD_TYPE_PROVISION };
+ 
+-	l_debug("HCI%d is up status: %d", index, status);
+-	if (status)
+-		return;
+-
+-	len = sizeof(struct mgmt_cp_set_mesh) + sizeof(mesh_ad_types);
+-	mesh = l_malloc(len);
+-
+-	mesh->enable = 1;
++	memset(buffer, 0, sizeof(buffer));
++	mesh->enable = enable;
+ 	mesh->window = L_CPU_TO_LE16(0x1000);
+ 	mesh->period = L_CPU_TO_LE16(0x1000);
+ 	mesh->num_ad_types = sizeof(mesh_ad_types);
+ 	memcpy(mesh->ad_types, mesh_ad_types, sizeof(mesh_ad_types));
++
++	if (!mesh_mgmt_send(MGMT_OP_SET_MESH_RECEIVER, index, sizeof(buffer),
++				mesh, mesh_up, L_UINT_TO_PTR(index), NULL))
++		l_error("HCI%d could not queue Mesh receiver %s", index,
++						enable ? "resume" : "pause");
++}
++
++static void ctl_up(uint8_t status, uint16_t length,
++					const void *param, void *user_data)
++{
++	int index = L_PTR_TO_UINT(user_data);
++
++	l_debug("HCI%d is up status: %d", index, status);
++	if (status)
++		return;
+ 
+ 	pvt->rx_id = mesh_mgmt_register(MGMT_EV_MESH_DEVICE_FOUND,
+ 				MGMT_INDEX_NONE, event_device_found, pvt,
+@@ -352,11 +363,8 @@
+ 	pvt->tx_id = mesh_mgmt_register(MGMT_EV_MESH_PACKET_CMPLT,
+ 					index, send_cmplt, pvt, NULL);
+ 
+-	mesh_mgmt_send(MGMT_OP_SET_MESH_RECEIVER, index, len, mesh,
+-			mesh_up, L_UINT_TO_PTR(index), NULL);
+-	l_debug("done %d mesh startup", index);
+-
+-	l_free(mesh);
++	set_mesh_receiver(index, true);
++	l_info("HCI%d Mesh scan/TX workaround enabled (unverified)", index);
+ 
+ 	if (pvt->send_idx == MGMT_INDEX_NONE) {
+ 		pvt->send_idx = index;
+@@ -504,18 +512,16 @@
+ static void send_queued(uint8_t status, uint16_t length,
+ 					const void *param, void *user_data)
+ {
+-	struct tx_pkt *tx = user_data;
+-
+-	if (status)
+-		l_debug("Mesh Send Failed: %d", status);
+-	else if (param && length >= 1)
+-		pvt->handle = *(uint8_t *) param;
+-
+-	if (tx->delete) {
+-		l_queue_remove_if(pvt->tx_pkts, simple_match, tx);
+-		l_free(tx);
+-		pvt->tx = NULL;
+-	}
++	if (!pvt)
++		return;
++
++	if (status || !param || length < 1) {
++		l_error("Mesh Send rejected: %d", status);
++		pvt->sending = false;
++		return;
++	}
++
++	pvt->handle = *(const uint8_t *) param;
+ }
+ 
+ static void send_pkt(struct mesh_io_private *pvt, struct tx_pkt *tx,
+@@ -545,8 +551,22 @@
+ 	if (tx->pkt[0] == MESH_AD_TYPE_PROVISION)
+ 		filter_dups(NULL, send->adv_data, get_instant());
+ 
+-	mesh_mgmt_send(MGMT_OP_MESH_SEND, index,
+-			len, send, send_queued, tx, NULL);
++	/* MGMT requests are serialized. Linux queues the send setup before
++	 * processing receiver resume, so LE Set Random Address runs with Mesh
++	 * scanning paused. Resume immediately after setup to hear Link Ack.
++	 * Keep at most one Mesh send outstanding: queued kernel sends could
++	 * otherwise start later, after scanning has resumed.
++	 */
++	pvt->sending = true;
++	pvt->handle = 0;
++	set_mesh_receiver(index, false);
++	if (!mesh_mgmt_send(MGMT_OP_MESH_SEND, index,
++			len, send, send_queued, NULL, NULL)) {
++		pvt->sending = false;
++		l_error("Could not queue Mesh Send");
++	}
++	/* Always queue resume, including when the send is rejected. */
++	set_mesh_receiver(index, true);
+ 	/* print_packet("Mesh Send Start", tx->pkt, tx->len); */
+ 	pvt->tx = tx;
+ }
+@@ -560,6 +580,15 @@
+ 
+ 	if (!pvt)
+ 		return;
++
++	/* Do not consume a retransmission while the previous send is active. */
++	if (pvt->sending) {
++		if (timeout)
++			l_timeout_modify_ms(timeout, 25);
++		else
++			pvt->tx_timeout = l_timeout_create_ms(25, tx_to, pvt, NULL);
++		return;
++	}
+ 
+ 	tx = l_queue_pop_head(pvt->tx_pkts);
+ 	if (!tx) {
+@@ -580,11 +609,14 @@
+ 		count = 1;
+ 	}
+ 
+-	tx->delete = !!(count == 1);
+-
+ 	send_pkt(pvt, tx, ms);
+ 
+ 	if (count == 1) {
++		/* MGMT copied the payload; callbacks must not retain tx because
++		 * tx_cancel may remove and free retransmissions while queued.
++		 */
++		pvt->tx = NULL;
++		l_free(tx);
+ 		/* Recalculate wakeup if we are responding to POLL */
+ 		tx = l_queue_peek_head(pvt->tx_pkts);
+ 

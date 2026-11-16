@@ -1,0 +1,7 @@
+build/
+.local/
+__pycache__/
+build-cmake/
+display-settings.conf
+display-settings.conf.tmp-*
+mesh-state/

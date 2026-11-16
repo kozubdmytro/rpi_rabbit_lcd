@@ -1,0 +1,54 @@
+[
+  {
+    "file": "main/sensor_protocol.h",
+    "sha256": "a81dfca1cf307e0625f42d446ab212724538709e7a0b6241660cefb692b1b34e"
+  },
+  {
+    "file": "main/moisture_protocol.h",
+    "sha256": "d8f5f0f6ae7fe37700164306392cd33e299a04f921687cfc285339cc89a60337"
+  },
+  {
+    "file": "main/chip_temperature_protocol.h",
+    "sha256": "f09cdbf130d9868d6e6a11133b57b9e886d1b440d1e4487242199a094bd8a75c"
+  },
+  {
+    "file": "main/duty_protocol.h",
+    "sha256": "a98820af91d9ccfc500aa0eccb5bd760f83a9210eb6c13af1e8b4dd2fb3000e4"
+  },
+  {
+    "file": "main/node_freshness.h",
+    "sha256": "066bdb7e63dec30635340f606a92a16e3d64b01e2bdb30079ad7a18877d679fe"
+  },
+  {
+    "file": "main/management_protocol.h",
+    "sha256": "5db6f9af3beb270e8494a7f85dc3083f20877eb8b860ba677c0fc042343f3a0a"
+  },
+  {
+    "file": "main/management_state.h",
+    "sha256": "1f9b2415bd9e9bc9faf85a4c099bb194dfd1c10d49518ab0e414181bec4fee23"
+  },
+  {
+    "file": "main/mesh_provisioner.c",
+    "sha256": "17c71a6e586aabdb74f5bca3a43457d1d264ebe8b42224ae71a7da838c3c040b"
+  },
+  {
+    "file": "main/mesh_provisioner.h",
+    "sha256": "56a6e1d45a7d2f594473d36e0acf4e34c51a74cdf0fbf11545ac1ebb6d13e69b"
+  },
+  {
+    "file": "main/esp_gatt_server.c",
+    "sha256": "a855b6592312738295e08d7f334d2aa23cda688caa47f3c4499ab99aea3f379c"
+  },
+  {
+    "file": "main/esp_gatt_server.h",
+    "sha256": "c544758d9821e206ef5ecd0c8a3e467e2735d9f790412e1efe917f81d40061d1"
+  },
+  {
+    "file": "main/pixelscreen.c",
+    "sha256": "862903c7fbbb10c3eda446305ba3ad1262df766e64cf135debb4bbf07f4d54b7"
+  },
+  {
+    "file": "main/pixelscreen.h",
+    "sha256": "5ba31f124423ddac0efc27bf7f48cae72dad64c6457730f1ba3c16c5e03ccae1"
+  }
+]

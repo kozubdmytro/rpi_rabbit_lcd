@@ -1,0 +1,5 @@
+deploy/build-mesh-workaround.sh text eol=lf
+deploy/bluez-5.82-mesh-scan-tx.patch text eol=lf
+deploy/bluetooth-mesh-scan-tx.conf text eol=lf
+deploy/fix-bluetooth-startup.sh text eol=lf
+*.sh text eol=lf

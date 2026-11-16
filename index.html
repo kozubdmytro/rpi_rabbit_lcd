@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Rabbit Pixel Studio</title>
+<style>
+  :root { color-scheme: dark; font: 14px system-ui, sans-serif; background: #14171c; color: #e6e9ef; }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; padding: 20px; max-width: 1400px; }
+  h1 { font-size: 23px; margin: 0 0 5px; } h2 { font-size: 15px; margin: 0 0 12px; }
+  p { color: #aeb6c3; margin: 4px 0 14px; }
+  main { display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 16px; }
+  section { background: #20252e; border: 1px solid #353d49; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  label { display: inline-flex; align-items: center; gap: 6px; } .stack { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; } .row:last-child { margin-bottom: 0; }
+  input, select, button, textarea { font: inherit; border: 1px solid #4a5362; border-radius: 4px; background: #151a22; color: inherit; padding: 7px; }
+  button { cursor: pointer; background: #303a48; } button:hover { background: #414f62; }
+  button.active, button[aria-pressed="true"] { border-color: #83e4bf; background: #245846; }
+  button:disabled { opacity: .45; cursor: default; } input[type=number] { width: 68px; } input[type=color] { width: 48px; height: 36px; padding: 3px; }
+  input[type=range] { padding: 0; width: 140px; } input[type=checkbox] { accent-color: #83e4bf; }
+  #hex { width: 100px; } #text { width: 100%; } #swatch { width: 27px; height: 27px; border: 1px solid #697587; border-radius: 4px; }
+  .hint { font-size: 12px; color: #aeb6c3; line-height: 1.5; } .wide { width: 100%; }
+  #stage { overflow: auto; padding: 12px; background: #101318; text-align: center; border-radius: 5px; }
+  .checker { background-color: #252b35; background-image: conic-gradient(#3a4350 25%,transparent 0 50%,#3a4350 0 75%,transparent 0); background-size: 16px 16px; }
+  #canvas { display: block; margin: auto; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+  #frames { display: flex; gap: 8px; overflow-x: auto; padding: 3px 0 8px; margin-top: 12px; }
+  .frame { flex: 0 0 auto; padding: 5px; min-width: 58px; } .frame canvas { display: block; width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; margin-bottom: 4px; }
+  textarea { width: 100%; min-height: 235px; resize: vertical; font: 12px/1.5 Consolas, monospace; tab-size: 2; }
+  #status { min-height: 22px; color: #83e4bf; margin: 8px 0; } #exportInfo { margin: 8px 0; }
+  @media(max-width: 760px) { body { padding: 12px; } main { grid-template-columns: 1fr; } aside { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 12px; } aside section { margin: 0; } }
+</style>
+</head>
+<body>
+<header><h1>Smart Rabbit Pixel Studio</h1><p>Offline pixel art &amp; animation · Raspberry Pi / Waveshare 64×64</p></header>
+<main>
+<aside>
+  <section>
+    <h2>Canvas</h2>
+    <div class="row"><label>Preset <select id="preset"><option>5x7</option><option>8x8</option><option selected>16x16</option><option>32x32</option><option>64x64</option></select></label></div>
+    <div class="row"><label>W <input id="width" type="number" min="1" max="64" value="16"></label><label>H <input id="height" type="number" min="1" max="64" value="16"></label><button id="resize">Resize</button></div>
+    <p class="hint">Resize keeps pixels at the top left of every frame. Pixels outside the new bounds are removed.</p>
+    <div class="row"><button id="undo" disabled>Undo</button><button id="clear">Clear frame</button></div>
+  </section>
+  <section>
+    <h2>Draw</h2>
+    <div class="row" id="tools"><button data-tool="pencil" aria-pressed="true">Pencil</button><button data-tool="eraser" aria-pressed="false">Eraser</button><button data-tool="fill" aria-pressed="false">Fill</button><button data-tool="picker" aria-pressed="false">Picker</button></div>
+    <div class="row"><input id="color" type="color" value="#70efb0" aria-label="Drawing color"><label>HEX <input id="hex" value="#70efb0" maxlength="7" spellcheck="false"></label></div>
+    <div class="row"><label>R <input id="r" type="number" min="0" max="255" value="112"></label><label>G <input id="g" type="number" min="0" max="255" value="239"></label><label>B <input id="b" type="number" min="0" max="255" value="176"></label></div>
+    <label>Brightness <input id="brightness" type="range" min="0" max="100" value="100"><output id="brightnessValue">100%</output></label>
+    <div class="row" style="margin-top:10px"><span id="swatch"></span><span id="effective" class="hint"></span></div>
+    <span class="hint">Brightness affects new pixels. The checkerboard is transparent.</span>
+  </section>
+  <section>
+    <h2>Text → pixels</h2>
+    <div class="stack"><input id="text" placeholder="Type text" aria-label="Text to draw"><div class="row"><label>Size <input id="textSize" type="number" min="1" max="64" value="7"></label><label>X <input id="textX" type="number" min="0" max="63" value="0"></label><label>Y <input id="textY" type="number" min="0" max="63" value="0"></label></div><button id="stamp">Stamp text</button></div>
+    <p class="hint">System monospace, size in pixels. Text uses the drawing color and clips at canvas edges.</p>
+  </section>
+  <section><h2>Project</h2><div class="row"><button id="save">Save JSON</button><button id="load">Load JSON</button><input id="projectFile" type="file" accept=".json,application/json" hidden></div></section>
+</aside>
+<div>
+  <section>
+    <div class="row"><h2 style="margin:0">Pixel canvas</h2><span id="canvasInfo" class="hint"></span></div>
+    <div id="stage"><canvas id="canvas" class="checker" aria-label="Pixel drawing canvas"></canvas></div>
+    <div id="frames" aria-label="Animation frames"></div>
+    <div class="row"><button id="add">Add blank</button><button id="duplicate">Duplicate</button><button id="delete">Delete frame</button><button id="play">Play</button><label>FPS <input id="fps" type="number" min="1" max="60" value="8"></label></div>
+  </section>
+  <section>
+    <h2>C / C++ export</h2>
+    <div class="row"><label>Format <select id="format"><option value="rgb888">RGB888 color</option><option value="rgb565">RGB565 color</option><option value="mono">1-bit monochrome</option></select></label><label><input id="crop" type="checkbox">Auto-crop transparent borders</label></div>
+    <p class="hint">All frames are exported. Cropping uses one shared bounding box to preserve animation alignment. Monochrome: every opaque pixel is on; transparent pixels are off.</p>
+    <div id="exportInfo" class="hint"></div>
+    <textarea id="code" readonly spellcheck="false" aria-label="Generated C or C++ code"></textarea>
+    <div class="row" style="margin-top:10px"><button id="copy">Copy code</button><button id="download">Download .h</button></div>
+  </section>
+</div>
+</main>
+<div id="status" role="status" aria-live="polite">Ready. Draw your first pixel.</div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let width = 16, height = 16, frames = [Array(256).fill(null)], current = 0;
+let tool = 'pencil', baseColor = 0x70efb0, brightness = 100, history = [], timer = null;
+let drawing = false, lastPoint = null;
+const canvas = $('canvas'), ctx = canvas.getContext('2d');
+let cell = 24;
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const integer = (value, fallback, lo, hi) => Number.isFinite(Number(value)) && String(value).trim() !== '' ? clamp(Math.round(Number(value)), lo, hi) : fallback;
+const hex = value => '#' + value.toString(16).padStart(6, '0');
+const say = message => { $('status').textContent = message; };
+function drawingColor() {
+  const scale = brightness / 100;
+  return (Math.round((baseColor >> 16) * scale) << 16) | (Math.round(((baseColor >> 8) & 255) * scale) << 8) | Math.round((baseColor & 255) * scale);
+}
+function syncColor() {
+  $('color').value = $('hex').value = hex(baseColor);
+  $('r').value = baseColor >> 16; $('g').value = (baseColor >> 8) & 255; $('b').value = baseColor & 255;
+  $('brightness').value = brightness; $('brightnessValue').textContent = brightness + '%';
+  $('swatch').style.background = hex(drawingColor()); $('effective').textContent = hex(drawingColor()).toUpperCase();
+}
+function stop() { if (timer !== null) clearInterval(timer); timer = null; $('play').textContent = 'Play'; }
+function remember() {
+  stop(); history.push({width, height, frames: frames.map(f => f.slice()), current});
+  if (history.length > 30) history.shift(); $('undo').disabled = false;
+}
+function renderCanvas() {
+  cell = Math.max(7, Math.min(36, Math.floor(512 / Math.max(width, height))));
+  const cw = width * cell, ch = height * cell;
+  if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+  ctx.clearRect(0, 0, cw, ch);
+  frames[current].forEach((color, i) => { if (color !== null) { ctx.fillStyle = hex(color); ctx.fillRect((i % width) * cell, Math.floor(i / width) * cell, cell, cell); } });
+  ctx.strokeStyle = 'rgba(0,0,0,.27)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x <= width; x++) { ctx.moveTo(x * cell + .5, 0); ctx.lineTo(x * cell + .5, ch); }
+  for (let y = 0; y <= height; y++) { ctx.moveTo(0, y * cell + .5); ctx.lineTo(cw, y * cell + .5); } ctx.stroke();
+  $('canvasInfo').textContent = `${width} × ${height} · Frame ${current + 1} / ${frames.length}`;
+  [...$('frames').children].forEach((button, i) => { button.classList.toggle('active', i === current); button.setAttribute('aria-pressed', String(i === current)); });
+}
+function renderFrames() {
+  $('frames').replaceChildren();
+  frames.forEach((frame, index) => {
+    const button = document.createElement('button'); button.className = 'frame'; button.title = `Select frame ${index + 1}`;
+    const thumb = document.createElement('canvas'); thumb.width = width; thumb.height = height; thumb.className = 'checker';
+    const tc = thumb.getContext('2d'); frame.forEach((color, i) => { if (color !== null) { tc.fillStyle = hex(color); tc.fillRect(i % width, Math.floor(i / width), 1, 1); } });
+    button.append(thumb, document.createTextNode(String(index + 1)));
+    button.onclick = () => { finishStroke(); stop(); current = index; renderCanvas(); };
+    $('frames').append(button);
+  });
+}
+function refresh() {
+  $('width').value = width; $('height').value = height;
+  $('delete').disabled = frames.length === 1; $('undo').disabled = history.length === 0;
+  renderFrames(); renderCanvas(); generate();
+}
+function resize(w, h) {
+  finishStroke(); if (w === width && h === height) return;
+  remember(); const oldW = width, oldH = height;
+  frames = frames.map(frame => { const next = Array(w * h).fill(null); for (let y = 0; y < Math.min(h, oldH); y++) for (let x = 0; x < Math.min(w, oldW); x++) next[y * w + x] = frame[y * oldW + x]; return next; });
+  width = w; height = h; refresh(); say(`Canvas resized to ${w} × ${h}. Undo restores clipped pixels.`);
+}
+function point(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((event.clientX - rect.left) * width / rect.width), y = Math.floor((event.clientY - rect.top) * height / rect.height);
+  return x >= 0 && x < width && y >= 0 && y < height ? {x,y} : null;
+}
+function paintLine(a, b) {
+  let x = a.x, y = a.y; const dx = Math.abs(b.x - x), sx = x < b.x ? 1 : -1, dy = -Math.abs(b.y - y), sy = y < b.y ? 1 : -1;
+  let err = dx + dy; const color = tool === 'eraser' ? null : drawingColor();
+  while (true) { frames[current][y * width + x] = color; if (x === b.x && y === b.y) break; const e = 2 * err; if (e >= dy) { err += dy; x += sx; } if (e <= dx) { err += dx; y += sy; } }
+}
+function fill(p) {
+  const frame = frames[current], target = frame[p.y * width + p.x], replacement = drawingColor(); if (target === replacement) return;
+  const stack = [p.y * width + p.x]; frame[stack[0]] = replacement;
+  while (stack.length) {
+    const i = stack.pop(), x = i % width, y = Math.floor(i / width);
+    const neighbors = []; if (x > 0) neighbors.push(i - 1); if (x < width - 1) neighbors.push(i + 1); if (y > 0) neighbors.push(i - width); if (y < height - 1) neighbors.push(i + width);
+    for (const next of neighbors) if (frame[next] === target) { frame[next] = replacement; stack.push(next); }
+  }
+}
+function finishStroke() {
+  if (!drawing) return; drawing = false; lastPoint = null; renderFrames(); renderCanvas(); generate();
+}
+canvas.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return; event.preventDefault(); stop(); const p = point(event); if (!p) return;
+  if (tool === 'picker') { const color = frames[current][p.y * width + p.x]; if (color !== null) { baseColor = color; brightness = 100; syncColor(); say('Drawing color picked.'); } else say('Transparent pixel; drawing color unchanged.'); return; }
+  remember();
+  if (tool === 'fill') { fill(p); refresh(); return; }
+  drawing = true; lastPoint = p; canvas.setPointerCapture(event.pointerId); paintLine(p, p); renderCanvas();
+});
+canvas.addEventListener('pointermove', event => { if (!drawing) return; const p = point(event); if (p) { paintLine(lastPoint || p, p); renderCanvas(); } lastPoint = p; });
+canvas.addEventListener('pointerup', finishStroke); canvas.addEventListener('pointercancel', finishStroke); canvas.addEventListener('lostpointercapture', finishStroke);
+$('tools').onclick = event => { if (!event.target.dataset.tool) return; finishStroke(); tool = event.target.dataset.tool; for (const b of $('tools').children) b.setAttribute('aria-pressed', String(b.dataset.tool === tool)); };
+$('color').oninput = () => { baseColor = parseInt($('color').value.slice(1),16); syncColor(); };
+$('hex').oninput = () => { const value = $('hex').value.trim().replace(/^#/, ''); if (/^[0-9a-f]{6}$/i.test(value)) { baseColor = parseInt(value,16); syncColor(); } };
+$('hex').onchange = () => { let value = $('hex').value.trim().replace(/^#/, ''); if (/^[0-9a-f]{3}$/i.test(value)) value = [...value].map(c => c+c).join(''); if (/^[0-9a-f]{6}$/i.test(value)) baseColor = parseInt(value,16); else say('Enter a valid 3- or 6-digit HEX color.'); syncColor(); };
+for (const id of ['r','g','b']) $(id).oninput = $(id).onchange = () => { baseColor = (integer($('r').value,0,0,255)<<16) | (integer($('g').value,0,0,255)<<8) | integer($('b').value,0,0,255); syncColor(); };
+$('brightness').oninput = () => { brightness = Number($('brightness').value); syncColor(); };
+$('resize').onclick = () => resize(integer($('width').value,width,1,64),integer($('height').value,height,1,64));
+$('preset').onchange = () => { const [w,h] = $('preset').value.split('x').map(Number); resize(w,h); };
+$('undo').onclick = () => { finishStroke(); if (!history.length) return; stop(); ({width,height,frames,current} = history.pop()); refresh(); say('Undone.'); };
+$('clear').onclick = () => { finishStroke(); remember(); frames[current].fill(null); refresh(); };
+$('stamp').onclick = () => {
+  const text = $('text').value; if (!text) { say('Type text first.'); return; }
+  finishStroke(); const size = integer($('textSize').value,7,1,64), x = integer($('textX').value,0,0,width-1), y = integer($('textY').value,0,0,height-1);
+  const temp = document.createElement('canvas'); temp.width = width; temp.height = height;
+  const tc = temp.getContext('2d'); tc.font = `${size}px monospace`; tc.textBaseline = 'top'; tc.fillStyle = '#fff'; tc.fillText(text,x,y);
+  const data = tc.getImageData(0,0,width,height).data; remember(); for (let i = 0; i < width * height; i++) if (data[i*4+3] >= 96) frames[current][i] = drawingColor(); refresh(); say('Text converted to editable pixels.');
+};
+$('add').onclick = () => { finishStroke(); remember(); frames.splice(current+1,0,Array(width*height).fill(null)); current++; refresh(); };
+$('duplicate').onclick = () => { finishStroke(); remember(); frames.splice(current+1,0,frames[current].slice()); current++; refresh(); };
+$('delete').onclick = () => { if (frames.length <= 1) return; finishStroke(); remember(); frames.splice(current,1); current = Math.min(current,frames.length-1); refresh(); };
+function fps() { return integer($('fps').value,8,1,60); }
+function play() { finishStroke(); if (timer !== null) { stop(); return; } $('fps').value = fps(); $('play').textContent = 'Pause'; timer = setInterval(() => { current = (current+1)%frames.length; renderCanvas(); },1000/fps()); }
+$('play').onclick = play;
+$('fps').onchange = () => { const playing = timer !== null; stop(); $('fps').value = fps(); generate(); if (playing) play(); };
+function bounds() {
+  if (!$('crop').checked) return {x:0,y:0,w:width,h:height};
+  let left = width, top = height, right = -1, bottom = -1;
+  for (const frame of frames) frame.forEach((color,i) => { if (color !== null) { const x = i%width, y = Math.floor(i/width); left = Math.min(left,x); top = Math.min(top,y); right = Math.max(right,x); bottom = Math.max(bottom,y); } });
+  return right < 0 ? {x:0,y:0,w:1,h:1} : {x:left,y:top,w:right-left+1,h:bottom-top+1};
+}
+function pack(pixels) {
+  const bytes = Array(Math.ceil(pixels.length/8)).fill(0); pixels.forEach((color,i) => { if (color !== null) bytes[i>>3] |= 0x80 >> (i&7); }); return bytes;
+}
+function generate() {
+  const b = bounds(), mono = $('format').value === 'mono', rgb888 = $('format').value === 'rgb888', count = frames.length, duration = Math.round(1000/fps());
+  const pixels = frames.map(frame => { const out = []; for (let y = b.y; y < b.y+b.h; y++) for (let x = b.x; x < b.x+b.w; x++) out.push(frame[y*width+x]); return out; });
+  const masked = !mono && pixels.some(frame => frame.some(color => color === null));
+  const data = pixels.map(frame => mono ? pack(frame) : rgb888 ? frame.flatMap(color => color === null ? [0,0,0] : [color>>16,(color>>8)&255,color&255]) : frame.map(color => color === null ? 0 : (((color>>19)&31)<<11) | (((color>>10)&63)<<5) | ((color>>3)&31)));
+  const array = (name,type,values,digits) => {
+    const lines = values.map((frame,i) => { const rows = []; for (let j = 0; j < frame.length; j+=12) rows.push('    '+frame.slice(j,j+12).map(v=>'0x'+v.toString(16).toUpperCase().padStart(digits,'0')).join(', ')); return `  { /* frame ${i+1} */\n${rows.join(',\n')}\n  }`; });
+    return `static const ${type} ${name}[${count}][${values[0].length}] = {\n${lines.join(',\n')}\n};\n`;
+  };
+  let code = `/* Smart Rabbit Pixel Studio\n * ${mono ? '1-bit: 1 = opaque/on, 0 = transparent/off.' : rgb888 ? 'RGB888: consecutive R, G, B bytes (0..255), 3 bytes per pixel.\n * Pixel (x,y): smart_rabbit_frames[frame][(y * smart_rabbit_width + x) * 3 + channel], channel R=0, G=1, B=2.' : 'RGB565: RRRRRGGG GGGBBBBB, numeric uint16_t values.'}\n * Row-major, left to right, top to bottom.\n * Packed bits (monochrome/mask): MSB first, continuous across rows; only the final byte is padded.\n * Crop origin in the source canvas: (${b.x}, ${b.y}).\n * Animation uses shared dimensions; duration is milliseconds per frame.\n */\n#ifndef SMART_RABBIT_ASSET_H\n#define SMART_RABBIT_ASSET_H\n#include <stdint.h>\n\nstatic const uint16_t smart_rabbit_width = ${b.w};\nstatic const uint16_t smart_rabbit_height = ${b.h};\nstatic const uint16_t smart_rabbit_frame_count = ${count};\nstatic const uint16_t smart_rabbit_frame_duration_ms[${count}] = { ${Array(count).fill(duration).join(', ')} };\n\n`;
+  code += array('smart_rabbit_frames',mono||rgb888?'uint8_t':'uint16_t',data,mono||rgb888?2:4);
+  if (masked) code += '\n/* Transparency mask: 1 = draw, 0 = skip; same packed-bit order. */\n'+array('smart_rabbit_mask','uint8_t',pixels.map(pack),2);
+  code += '\n#endif /* SMART_RABBIT_ASSET_H */\n'; $('code').value = code;
+  const bytes = count * (data[0].length * (mono||rgb888?1:2) + (masked?Math.ceil(b.w*b.h/8):0) + 2) + 6;
+  $('exportInfo').textContent = `${b.w} × ${b.h} · ${count} frame${count===1?'':'s'} · ${duration} ms/frame · ≈ ${bytes.toLocaleString()} bytes (pixels${masked?' + mask':''} + metadata; excludes compiler overhead)${$('crop').checked && pixels.every(f=>f.every(c=>c===null))?' · Empty asset: 1 × 1 transparent.':''}`;
+}
+$('format').onchange = generate; $('crop').onchange = generate;
+function download(name, content, type) {
+  const url = URL.createObjectURL(new Blob([content],{type})), link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+$('download').onclick = () => { finishStroke(); generate(); download('smart_rabbit.h',$('code').value,'text/plain'); say('Header downloaded.'); };
+$('copy').onclick = async () => {
+  finishStroke(); generate();
+  try { if (!navigator.clipboard || !window.isSecureContext) throw new Error(); await navigator.clipboard.writeText($('code').value); say('Code copied.'); }
+  catch { $('code').focus(); $('code').select(); try { if (!document.execCommand('copy')) throw new Error(); say('Code copied.'); } catch { say('Code selected. Press Ctrl+C to copy.'); } }
+};
+$('save').onclick = () => {
+  finishStroke(); download('smart_rabbit.json',JSON.stringify({app:'Smart Rabbit Pixel Studio',version:1,width,height,frames,current,fps:fps(),baseColor,brightness,format:$('format').value,crop:$('crop').checked}),'application/json'); say('Editable project saved.');
+};
+$('load').onclick = () => $('projectFile').click();
+$('projectFile').onchange = async event => {
+  const file = event.target.files[0]; if (!file) return;
+  try {
+    if (file.size > 20*1024*1024) throw new Error('Project exceeds 20 MB.');
+    const project = JSON.parse(await file.text()), validDimension = n => Number.isInteger(n) && n>=1 && n<=64;
+    if (project.version !== 1 || !validDimension(project.width) || !validDimension(project.height) || !Array.isArray(project.frames) || !project.frames.length || project.frames.length>65535 || !project.frames.every(f=>Array.isArray(f) && f.length===project.width*project.height && f.every(c=>c===null || (Number.isInteger(c) && c>=0 && c<=0xffffff)))) throw new Error('Invalid project dimensions or pixel data.');
+    finishStroke(); remember(); width = project.width; height = project.height; frames = project.frames;
+    current = integer(project.current,0,0,frames.length-1); $('fps').value = integer(project.fps,8,1,60);
+    baseColor = integer(project.baseColor,0x70efb0,0,0xffffff); brightness = integer(project.brightness,100,0,100);
+    $('format').value = ['rgb888','rgb565','mono'].includes(project.format) ? project.format : 'rgb888'; $('crop').checked = project.crop === true;
+    syncColor(); refresh(); say('Project loaded.');
+  } catch (error) { say('Could not load project: '+error.message); }
+  event.target.value = '';
+};
+syncColor(); refresh();
+</script>
+</body>
+</html>
