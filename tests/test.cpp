@@ -29,8 +29,8 @@ int main() {
         for(int y=0;y<320;++y)for(int x=0;x<480;++x)check(equal(out[y*480+x],x<80||x>=400?black:f.at((x-80)/5,y/5)),"every physical pixel is an exact sample; margins black");
         auto withStrip=out;drawTouchStrip(withStrip,480,320);
         for(int y=0;y<320;++y)for(int x=0;x<480;++x) {
-            const bool line=x>=468&&x<471&&y>=12&&y<=307;
-            check(equal(withStrip[y*480+x],line?RGB{150,150,150}:out[y*480+x]),"only the right strip changes the output");
+            const bool line=((x>=6&&x<15)||(x>=465&&x<474))&&y>=12&&y<=307;
+            check(equal(withStrip[y*480+x],line?RGB{150,150,150}:out[y*480+x]),"only the two thicker strips change the output");
         }
         StripContact strip;
         check(strip.update(468,12,true).position==0,"strip top is zero");
@@ -43,16 +43,25 @@ int main() {
         check(!strip.update(430,160,true).healthy,"leaving strip cancels without a click");
         check(!strip.update(468,160,true).healthy,"cancelled contact cannot resume");
         check(strip.update(468,160,false).healthy,"release clears cancellation");
+        check(strip.update(10,12,true).position==0,"left strip top is zero");
+        check(strip.update(10,307,true).position==1,"left strip downward swipe increases position");
+        check(!strip.update(468,307,true).healthy,"switching sides during contact cancels");
+        strip.update(10,307,false);
+        check(strip.update(40,160,true).position==-1,"left hit area stops before UI");
+        check(strip.update(10,160,true).position==-1,"outside contact cannot enter left strip");
+        strip.update(10,160,false);
         drawTouchStrip(withStrip,480,320,0);
-        check(equal(withStrip[160*480+468],black),"zero brightness hides line while touch stays available");
-        HubDemo ui;mesh::View state;Framebuffer uiFrame;StripContact control;
-        auto gesture=[&](double y,bool down,int64_t time) {ui.draw(uiFrame,control.update(468,y,down),time,state);};
-        gesture(240,true,1000000);gesture(40,true,1100000);gesture(40,false,1200000); // Quick.
-        gesture(180,true,1300000);gesture(180,true,2010000); // Hold starts brightness adjustment.
-        gesture(307,true,2050000);
-        check(ui.displayBrightness(50)==100,"strip hold and motion reach maximum brightness");
-        gesture(307,false,2100000);
-        check(ui.takeBrightnessRequest()==100,"release saves brightness through existing UI contract");
+        check(equal(withStrip[160*480+468],black)&&equal(withStrip[160*480+10],black),"zero brightness hides line while touch stays available");
+        for(int controlX:{10,468}) {
+            HubDemo ui;mesh::View state;Framebuffer uiFrame;StripContact control;
+            auto gesture=[&](double y,bool down,int64_t time) {ui.draw(uiFrame,control.update(controlX,y,down),time,state);};
+            gesture(240,true,1000000);gesture(40,true,1100000);gesture(40,false,1200000); // Quick.
+            gesture(180,true,1300000);gesture(180,true,2010000); // Hold starts brightness adjustment.
+            gesture(307,true,2050000);
+            check(ui.displayBrightness(50)==100,"strip hold and motion reach maximum brightness");
+            gesture(307,false,2100000);
+            check(ui.takeBrightnessRequest()==100,"release saves brightness through existing UI contract");
+        }
         for(uint8_t rotation=1;rotation<=4;++rotation) {
             auto rotated=f;screens::rotate(rotated,rotation);
             for(int y=0;y<64;++y)for(int x=0;x<64;++x) {

@@ -5,14 +5,15 @@ with XPT2046. The original 64x64 UI, fonts, menu, animations, Mesh,
 Wi-Fi provisioning and local settings website are retained.
 
 Each logical pixel becomes an exact 5x5 block (nearest neighbour).
-The 320x320 image is centered at x=80, y=0. The left side stays black; the right side now contains only the touch strip
+The 320x320 image is centered at x=80, y=0. The side areas now contain only the two touch strips
 requested for MPR121-style control. Rotation remains
 inside the original 64x64 frame, as in the matrix version.
 
 MPR121 and HUB75 code and dependencies are removed. The XPT2046/ADS7846
-resistive touchscreen now drives the existing gesture logic through a narrow
-vertical control area at the physical right edge. The gray line is x=468..470,
-y=12..307; the touch target is x=440..479 across the screen height.
+resistive touchscreen now drives the existing gesture logic through two
+vertical control areas at the physical edges. Both gray lines are 9 pixels
+wide: x=6..14 and x=465..473, y=12..307. Touch targets are x=0..39 and
+x=440..479 across the screen height.
 Position increases downward. Taps, swipes and 700 ms holds retain their
 original meaning. A touch must begin inside the strip; leaving it cancels
 without a click. Touches on the 320x320 UI do nothing.
@@ -23,7 +24,8 @@ An optional local `touch-calibration.conf` uses the previous `SR_TOUCH_V1`
 affine format; otherwise the default is uncalibrated landscape rotate=90.
 The installed Pi reuses its existing calibrated file. Calibration is ignored
 by Git. Software brightness also dims the strip; touch remains active at 0%.
-The strip stays at the physical right edge when UI rotation changes.
+The strips stay at the physical edges when UI rotation changes.
+Each contact belongs to the side where it began; jumping sides cancels it.
 
 ## LCD prerequisites
 
