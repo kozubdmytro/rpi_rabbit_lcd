@@ -34,9 +34,16 @@ public:
                 throw std::runtime_error("Cannot query LCD framebuffer: "+device);
             if(screen.xres!=480||screen.yres!=320)
                 throw std::runtime_error("LCD framebuffer must be 480x320; refusing to resize or stretch UI");
-            if(fixed.type!=FB_TYPE_PACKED_PIXELS||fixed.visual!=FB_VISUAL_TRUECOLOR||screen.grayscale||screen.nonstd||
+            if(fixed.type!=FB_TYPE_PACKED_PIXELS||fixed.visual!=FB_VISUAL_TRUECOLOR||screen.grayscale||
                (screen.bits_per_pixel!=16&&screen.bits_per_pixel!=24&&screen.bits_per_pixel!=32))
                 throw std::runtime_error("LCD requires packed truecolor RGB at 16, 24 or 32 bits per pixel");
+            // FBTFT fb_ili9486 reports nonstd=1 for its ordinary RGB565 buffer.
+            const bool ili9486=std::strncmp(fixed.id,"fb_ili9486",sizeof(fixed.id))==0&&
+                screen.bits_per_pixel==16&&screen.red.offset==11&&screen.red.length==5&&
+                screen.green.offset==5&&screen.green.length==6&&screen.blue.offset==0&&
+                screen.blue.length==5&&!screen.transp.length;
+            if(screen.nonstd&&!(screen.nonstd==1&&ili9486))
+                throw std::runtime_error("Unsupported nonstandard LCD framebuffer");
             uint32_t used=0;
             for(const auto* field:{&screen.red,&screen.green,&screen.blue,&screen.transp}) {
                 if(field->msb_right||field->length>8||field->offset>screen.bits_per_pixel||
